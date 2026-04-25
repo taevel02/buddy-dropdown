@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+# PyQt6
+.pytest_cache
+build/
+dist/
+*.egg-info
+
+# py2app
+dist/
+build/
+
+# pyinstaller
+dist/
+build/
+*.spec
+
+# Distribution
+*.egg
+*.tar
+*.tar.gz
+*.zip
+*.whl
+
+# Testing
+.coverage
+htmlcov/
+*.log
+.tox/
