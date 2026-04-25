@@ -4,7 +4,15 @@ APP = ["app.py"]
 DATA_FILES = []
 OPTIONS = {
     "argv_emulation": False,
-    "packages": ["PyQt6", "markitdown"],
+    "packages": [
+        "PyQt6", 
+        "markitdown", 
+        "charset_normalizer", 
+        "requests", 
+        "certifi",
+        "pdfplumber",
+        "pdfminer"
+    ],
     "includes": [],
     "plist": {
         "CFBundleName": "Dropdown",
