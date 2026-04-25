@@ -31,3 +31,6 @@ build/
 htmlcov/
 *.log
 .tox/
+
+# MacOS
+.DS_Store
