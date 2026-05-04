@@ -1,6 +1,7 @@
 # BUDDY DROPDOWN
 
 Dropdown is a macOS application that provides a clean interface for bidirectional document conversion:
+
 - **PDF to Markdown**: Converts `.pdf` files to `.md` using `markitdown`.
 - **Markdown to PDF**: Converts `.md` files to `.pdf` using the `markdown` library and PyQt6.
 
