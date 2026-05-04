@@ -1,6 +1,8 @@
 # BUDDY DROPDOWN
 
-Dropdown is a macOS application that converts PDF files to Markdown files using markitdown.
+Dropdown is a macOS application that provides a clean interface for bidirectional document conversion:
+- **PDF to Markdown**: Converts `.pdf` files to `.md` using `markitdown`.
+- **Markdown to PDF**: Converts `.md` files to `.pdf` using the `markdown` library and PyQt6.
 
 This guide details how to install dependencies, run the application locally, and package it into a macOS `.app` bundle using `py2app`.
 
@@ -29,7 +31,7 @@ Before packaging the app, you can test it directly using Python:
 python3 app.py
 ```
 
-A window should open with a "Drag & Drop PDFs Here" zone. You can drag one or more `.pdf` files into this zone to test the conversion. The resulting `.md` files will be saved in the same directory as the original `.pdf` files.
+A window will open with a toggle button at the top to choose between **`.pdf ➔ .md`** and **`.md ➔ .pdf`** modes. Depending on the selected mode, you can drag and drop multiple `.pdf` or `.md` files into the Drop Zone. The converted files will be saved in the same directory as the original files.
 
 ## 3. Build the macOS .app Bundle
 
@@ -62,3 +64,23 @@ You can run your app by either:
 ```bash
 open dist/Dropdown.app
 ```
+
+## 5. Automated GitHub Releases (.dmg)
+
+This project is configured with GitHub Actions to automatically build and release a `.dmg` installer.
+
+1. Commit your changes and push them to the `main` branch:
+   ```bash
+   git push origin main
+   ```
+2. Create a version tag (must start with `v`, e.g., `v1.0.0`) and push it:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+3. GitHub Actions will automatically:
+   - Build the macOS `.app` using `py2app`.
+   - Package it into a `.dmg` file using `create-dmg`.
+   - Create a new GitHub Release and upload the `.dmg` file.
+
+You can then download the installer directly from the repository's **Releases** page!
