@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMarginsF
-from PyQt6.QtGui import QTextDocument, QPageSize, QPageLayout
+from PyQt6.QtGui import QTextDocument, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 import markdown
 from markitdown import MarkItDown
@@ -59,11 +59,11 @@ class ConversionWorker(QThread):
                     <html>
                     <head>
                     <style>
-                        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; font-size: 11pt; }}
+                        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; font-size: 10pt; }}
                         h1 {{ font-size: 16pt; margin-bottom: 12pt; }}
                         h2 {{ font-size: 14pt; margin-bottom: 10pt; }}
                         h3 {{ font-size: 12pt; margin-bottom: 8pt; }}
-                        h4, h5, h6 {{ font-size: 11pt; margin-bottom: 6pt; font-weight: bold; }}
+                        h4, h5, h6 {{ font-size: 10pt; margin-bottom: 6pt; font-weight: bold; }}
                         table {{ border-collapse: collapse; width: 100%; margin-bottom: 1rem; }}
                         th, td {{ border: 1px solid #ddd; padding: 6px; font-size: 10pt; }}
                         th {{ padding-top: 10px; padding-bottom: 10px; text-align: left; background-color: #f2f2f2; }}
@@ -79,17 +79,17 @@ class ConversionWorker(QThread):
                     """
                     doc = QTextDocument()
                     doc.setHtml(html_doc)
-                    
+
                     printer = QPrinter(QPrinter.PrinterMode.HighResolution)
                     printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
                     printer.setOutputFileName(str(pdf_path))
-                    
+
                     # Set A4 size and margins
                     page_layout = printer.pageLayout()
                     page_layout.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
-                    page_layout.setMargins(QMarginsF(15, 15, 15, 15)) # 15mm margins
+                    page_layout.setMargins(QMarginsF(15, 15, 15, 15))  # 15mm margins
                     printer.setPageLayout(page_layout)
-                    
+
                     doc.print(printer)
 
             except Exception as e:
@@ -134,6 +134,7 @@ class DropZone(QLabel):
         """
         self.setStyleSheet(self.default_style)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAcceptDrops(True)
 
     def set_mode(self, mode):
         self.current_mode = mode
@@ -141,6 +142,46 @@ class DropZone(QLabel):
             self.setText("Drag & Drop .pdf")
         else:
             self.setText("Drag & Drop .md")
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if self.current_mode == 0:
+                valid = any(url.toLocalFile().lower().endswith(".pdf") for url in urls)
+            else:
+                valid = any(
+                    url.toLocalFile().lower().endswith((".md", ".markdown"))
+                    for url in urls
+                )
+
+            if valid:
+                event.acceptProposedAction()
+                self.setStyleSheet(self.hover_style)
+            else:
+                event.ignore()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet(self.default_style)
+
+    def dropEvent(self, event):
+        self.setStyleSheet(self.default_style)
+        files = []
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if self.current_mode == 0:
+                if file_path.lower().endswith(".pdf"):
+                    files.append(file_path)
+            else:
+                if file_path.lower().endswith((".md", ".markdown")):
+                    files.append(file_path)
+
+        if files:
+            self.files_dropped.emit(files)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -163,7 +204,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Dropdown")
         self.setMinimumSize(450, 420)
-        self.setAcceptDrops(True)
 
         # Apply general font and clean white background
         self.setStyleSheet(
@@ -353,43 +393,6 @@ class MainWindow(QMainWindow):
             self.btn_md_to_pdf.setStyleSheet(self.styles["active_right"])
 
         self.drop_zone.set_mode(mode_index)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if self.drop_zone.current_mode == 0:
-                valid = any(url.toLocalFile().lower().endswith(".pdf") for url in urls)
-            else:
-                valid = any(
-                    url.toLocalFile().lower().endswith((".md", ".markdown"))
-                    for url in urls
-                )
-
-            if valid:
-                event.accept()
-                self.drop_zone.setStyleSheet(self.drop_zone.hover_style)
-            else:
-                event.ignore()
-        else:
-            event.ignore()
-
-    def dragLeaveEvent(self, event):
-        self.drop_zone.setStyleSheet(self.drop_zone.default_style)
-
-    def dropEvent(self, event):
-        self.drop_zone.setStyleSheet(self.drop_zone.default_style)
-        files = []
-        for url in event.mimeData().urls():
-            file_path = url.toLocalFile()
-            if self.drop_zone.current_mode == 0:
-                if file_path.lower().endswith(".pdf"):
-                    files.append(file_path)
-            else:
-                if file_path.lower().endswith((".md", ".markdown")):
-                    files.append(file_path)
-
-        if files:
-            self.start_conversion(files)
 
     def start_conversion(self, files):
         if self.worker and self.worker.isRunning():
