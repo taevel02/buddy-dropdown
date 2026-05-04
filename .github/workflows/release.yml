@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
@@ -35,6 +37,8 @@ jobs:
       
     - name: Create DMG
       run: |
+        mkdir -p dist/dmg
+        cp -r dist/Dropdown.app dist/dmg/
         create-dmg \
           --volname "Dropdown" \
           --window-pos 200 120 \
@@ -44,7 +48,7 @@ jobs:
           --hide-extension "Dropdown.app" \
           --app-drop-link 450 190 \
           "dist/Dropdown.dmg" \
-          "dist/Dropdown.app/"
+          "dist/dmg/"
           
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
