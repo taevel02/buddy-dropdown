@@ -9,8 +9,13 @@ from PyQt6.QtWidgets import (
     QWidget,
     QProgressBar,
     QMessageBox,
+    QPushButton,
+    QHBoxLayout,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QTextDocument
+from PyQt6.QtPrintSupport import QPrinter
+import markdown
 from markitdown import MarkItDown
 
 
@@ -19,9 +24,10 @@ class ConversionWorker(QThread):
     finished = pyqtSignal(int)  # total processed
     error_occurred = pyqtSignal(str, str)  # filename, error message
 
-    def __init__(self, file_paths):
+    def __init__(self, file_paths, mode=0):
         super().__init__()
         self.file_paths = file_paths
+        self.mode = mode
         self.markitdown = MarkItDown()
 
     def run(self):
@@ -32,13 +38,47 @@ class ConversionWorker(QThread):
                 # Notify progress start for this file
                 self.progress_updated.emit(i + 1, total_files, filename)
 
-                # Convert PDF to MD using markitdown
-                result = self.markitdown.convert(file_path)
+                if self.mode == 0:
+                    # Convert PDF to MD using markitdown
+                    result = self.markitdown.convert(file_path)
 
-                # Save MD file
-                md_path = Path(file_path).with_suffix(".md")
-                with open(md_path, "w", encoding="utf-8") as f:
-                    f.write(result.text_content)
+                    # Save MD file
+                    md_path = Path(file_path).with_suffix(".md")
+                    with open(md_path, "w", encoding="utf-8") as f:
+                        f.write(result.text_content)
+                else:
+                    # Convert MD to PDF using markdown and QTextDocument
+                    pdf_path = Path(file_path).with_suffix(".pdf")
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        md_text = f.read()
+
+                    html_content = markdown.markdown(
+                        md_text, extensions=["tables", "fenced_code"]
+                    )
+                    html_doc = f"""
+                    <html>
+                    <head>
+                    <style>
+                        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }}
+                        table {{ border-collapse: collapse; width: 100%; margin-bottom: 1rem; }}
+                        th, td {{ border: 1px solid #ddd; padding: 8px; }}
+                        th {{ padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #f2f2f2; }}
+                        pre {{ background-color: #f4f4f4; padding: 10px; border-radius: 5px; }}
+                        code {{ font-family: monospace; background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
+                        blockquote {{ border-left: 4px solid #ddd; margin: 0; padding-left: 10px; color: #666; }}
+                    </style>
+                    </head>
+                    <body>
+                    {html_content}
+                    </body>
+                    </html>
+                    """
+                    doc = QTextDocument()
+                    doc.setHtml(html_doc)
+                    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+                    printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+                    printer.setOutputFileName(str(pdf_path))
+                    doc.print(printer)
 
             except Exception as e:
                 self.error_occurred.emit(os.path.basename(file_path), str(e))
@@ -50,7 +90,8 @@ class DropZone(QLabel):
     files_dropped = pyqtSignal(list)
 
     def __init__(self):
-        super().__init__("Drag & Drop PDFs Here")
+        super().__init__("Drag & Drop .pdf")
+        self.current_mode = 0
         self.setMinimumWidth(300)
         self.setMinimumHeight(200)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -58,36 +99,48 @@ class DropZone(QLabel):
             QLabel {
                 border: 2px dashed #d2d2d7;
                 border-radius: 16px;
-                font-size: 16px;
-                font-weight: 500;
+                font-size: 18px;
+                font-weight: 600;
                 color: #86868b;
                 background-color: #fafafa;
             }
             QLabel:hover {
-                border: 2px dashed #007aff;
-                background-color: #f0f8ff;
-                color: #007aff;
+                border: 2px dashed #1d1d1f;
+                background-color: #f5f5f7;
+                color: #1d1d1f;
             }
         """
         self.hover_style = """
             QLabel {
-                border: 2px dashed #007aff;
+                border: 2px dashed #1d1d1f;
                 border-radius: 16px;
-                font-size: 16px;
-                font-weight: 500;
-                color: #007aff;
-                background-color: #e6f2ff;
+                font-size: 18px;
+                font-weight: 600;
+                color: #1d1d1f;
+                background-color: #f5f5f7;
             }
         """
         self.setStyleSheet(self.default_style)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
+    def set_mode(self, mode):
+        self.current_mode = mode
+        if mode == 0:
+            self.setText("Drag & Drop .pdf")
+        else:
+            self.setText("Drag & Drop .md")
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             from PyQt6.QtWidgets import QFileDialog
 
+            if self.current_mode == 0:
+                filter_str = ".pdf Files (*.pdf)"
+            else:
+                filter_str = ".md Files (*.md *.markdown)"
+
             files, _ = QFileDialog.getOpenFileNames(
-                self, "Select PDF Files", "", "PDF Files (*.pdf)"
+                self, "Select Files", "", filter_str
             )
             if files:
                 self.files_dropped.emit(files)
@@ -139,35 +192,103 @@ class MainWindow(QMainWindow):
         self.card.setLayout(self.card_layout)
         self.main_layout.addWidget(self.card)
 
-        # Header Title
-        self.title_label = QLabel("PDF to Markdown")
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setStyleSheet(
-            """
-            color: #1d1d1f; 
-            font-size: 26px; 
-            font-weight: 800; 
-            background: transparent;
-            border: none;
-        """
-        )
-        self.card_layout.addWidget(self.title_label)
+        # Mode Toggle Container
+        self.toggle_container = QWidget()
+        self.toggle_layout = QHBoxLayout()
+        self.toggle_layout.setContentsMargins(0, 0, 0, 0)
+        self.toggle_layout.setSpacing(0)
+        self.toggle_container.setLayout(self.toggle_layout)
 
-        # Subtitle
-        self.subtitle_label = QLabel(
-            "Drop your documents below to magically convert them"
-        )
-        self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.subtitle_label.setStyleSheet(
-            """
-            color: #86868b; 
-            font-size: 13px; 
-            font-weight: 500;
-            background: transparent;
-            border: none;
+        self.btn_pdf_to_md = QPushButton(".pdf ➔ .md")
+        self.btn_md_to_pdf = QPushButton(".md ➔ .pdf")
+
+        self.btn_pdf_to_md.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_md_to_pdf.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        active_style_left = """
+            QPushButton {
+                background-color: #1d1d1f;
+                color: white;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 10px 16px;
+                border: 1px solid #1d1d1f;
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
+                border-top-right-radius: 0px;
+                border-bottom-right-radius: 0px;
+            }
         """
+        inactive_style_left = """
+            QPushButton {
+                background-color: #ffffff;
+                color: #1d1d1f;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 10px 16px;
+                border: 1px solid #d2d2d7;
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
+                border-top-right-radius: 0px;
+                border-bottom-right-radius: 0px;
+            }
+            QPushButton:hover {
+                background-color: #f5f5f7;
+            }
+        """
+        active_style_right = """
+            QPushButton {
+                background-color: #1d1d1f;
+                color: white;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 10px 16px;
+                border: 1px solid #1d1d1f;
+                border-top-left-radius: 0px;
+                border-bottom-left-radius: 0px;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }
+        """
+        inactive_style_right = """
+            QPushButton {
+                background-color: #ffffff;
+                color: #1d1d1f;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 10px 16px;
+                border: 1px solid #d2d2d7;
+                border-left: none;
+                border-top-left-radius: 0px;
+                border-bottom-left-radius: 0px;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #f5f5f7;
+            }
+        """
+
+        self.btn_pdf_to_md.setStyleSheet(active_style_left)
+        self.btn_md_to_pdf.setStyleSheet(inactive_style_right)
+
+        self.btn_pdf_to_md.clicked.connect(lambda: self.set_mode(0))
+        self.btn_md_to_pdf.clicked.connect(lambda: self.set_mode(1))
+
+        # Store styles for later toggling
+        self.styles = {
+            "active_left": active_style_left,
+            "inactive_left": inactive_style_left,
+            "active_right": active_style_right,
+            "inactive_right": inactive_style_right,
+        }
+
+        self.toggle_layout.addWidget(self.btn_pdf_to_md)
+        self.toggle_layout.addWidget(self.btn_md_to_pdf)
+
+        self.card_layout.addWidget(
+            self.toggle_container, alignment=Qt.AlignmentFlag.AlignCenter
         )
-        self.card_layout.addWidget(self.subtitle_label)
 
         # Drop Zone
         self.drop_zone = DropZone()
@@ -211,10 +332,28 @@ class MainWindow(QMainWindow):
 
         self.worker = None
 
+    def set_mode(self, mode_index):
+        if mode_index == 0:
+            self.btn_pdf_to_md.setStyleSheet(self.styles["active_left"])
+            self.btn_md_to_pdf.setStyleSheet(self.styles["inactive_right"])
+        else:
+            self.btn_pdf_to_md.setStyleSheet(self.styles["inactive_left"])
+            self.btn_md_to_pdf.setStyleSheet(self.styles["active_right"])
+
+        self.drop_zone.set_mode(mode_index)
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
-            if any(url.toLocalFile().lower().endswith(".pdf") for url in urls):
+            if self.drop_zone.current_mode == 0:
+                valid = any(url.toLocalFile().lower().endswith(".pdf") for url in urls)
+            else:
+                valid = any(
+                    url.toLocalFile().lower().endswith((".md", ".markdown"))
+                    for url in urls
+                )
+
+            if valid:
                 event.accept()
                 self.drop_zone.setStyleSheet(self.drop_zone.hover_style)
             else:
@@ -230,8 +369,12 @@ class MainWindow(QMainWindow):
         files = []
         for url in event.mimeData().urls():
             file_path = url.toLocalFile()
-            if file_path.lower().endswith(".pdf"):
-                files.append(file_path)
+            if self.drop_zone.current_mode == 0:
+                if file_path.lower().endswith(".pdf"):
+                    files.append(file_path)
+            else:
+                if file_path.lower().endswith((".md", ".markdown")):
+                    files.append(file_path)
 
         if files:
             self.start_conversion(files)
@@ -243,7 +386,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        self.worker = ConversionWorker(files)
+        self.worker = ConversionWorker(files, self.drop_zone.current_mode)
         self.worker.progress_updated.connect(self.update_progress)
         self.worker.finished.connect(self.conversion_finished)
         self.worker.error_occurred.connect(self.show_error)
@@ -261,10 +404,12 @@ class MainWindow(QMainWindow):
     def conversion_finished(self, total_files):
         self.progress_bar.setValue(total_files)
         self.status_label.setText("Conversion complete!")
+        mode = self.drop_zone.current_mode
+        ext = ".md" if mode == 0 else ".pdf"
         QMessageBox.information(
             self,
             "Success",
-            f"Successfully converted {total_files} file(s) to Markdown.",
+            f"Successfully converted {total_files} file(s) to {ext}.",
         )
         self.progress_bar.setValue(0)
         self.status_label.setText("Ready")
