@@ -11,7 +11,8 @@ OPTIONS = {
         "requests", 
         "certifi",
         "pdfplumber",
-        "pdfminer"
+        "pdfminer",
+        "markdown"
     ],
     "includes": [],
     "plist": {

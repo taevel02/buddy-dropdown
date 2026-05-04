@@ -1,3 +1,4 @@
 PyQt6
 markitdown[pdf]
 py2app
+markdown
