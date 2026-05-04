@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QTextDocument
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMarginsF
+from PyQt6.QtGui import QTextDocument, QPageSize, QPageLayout
 from PyQt6.QtPrintSupport import QPrinter
 import markdown
 from markitdown import MarkItDown
@@ -53,18 +53,22 @@ class ConversionWorker(QThread):
                         md_text = f.read()
 
                     html_content = markdown.markdown(
-                        md_text, extensions=["tables", "fenced_code"]
+                        md_text, extensions=["tables", "fenced_code", "nl2br"]
                     )
                     html_doc = f"""
                     <html>
                     <head>
                     <style>
-                        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }}
+                        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; font-size: 11pt; }}
+                        h1 {{ font-size: 16pt; margin-bottom: 12pt; }}
+                        h2 {{ font-size: 14pt; margin-bottom: 10pt; }}
+                        h3 {{ font-size: 12pt; margin-bottom: 8pt; }}
+                        h4, h5, h6 {{ font-size: 11pt; margin-bottom: 6pt; font-weight: bold; }}
                         table {{ border-collapse: collapse; width: 100%; margin-bottom: 1rem; }}
-                        th, td {{ border: 1px solid #ddd; padding: 8px; }}
-                        th {{ padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #f2f2f2; }}
-                        pre {{ background-color: #f4f4f4; padding: 10px; border-radius: 5px; }}
-                        code {{ font-family: monospace; background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
+                        th, td {{ border: 1px solid #ddd; padding: 6px; font-size: 10pt; }}
+                        th {{ padding-top: 10px; padding-bottom: 10px; text-align: left; background-color: #f2f2f2; }}
+                        pre {{ background-color: #f4f4f4; padding: 10px; border-radius: 5px; font-size: 10pt; }}
+                        code {{ font-family: monospace; background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-size: 10pt; }}
                         blockquote {{ border-left: 4px solid #ddd; margin: 0; padding-left: 10px; color: #666; }}
                     </style>
                     </head>
@@ -75,9 +79,17 @@ class ConversionWorker(QThread):
                     """
                     doc = QTextDocument()
                     doc.setHtml(html_doc)
+                    
                     printer = QPrinter(QPrinter.PrinterMode.HighResolution)
                     printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
                     printer.setOutputFileName(str(pdf_path))
+                    
+                    # Set A4 size and margins
+                    page_layout = printer.pageLayout()
+                    page_layout.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+                    page_layout.setMargins(QMarginsF(15, 15, 15, 15)) # 15mm margins
+                    printer.setPageLayout(page_layout)
+                    
                     doc.print(printer)
 
             except Exception as e:
