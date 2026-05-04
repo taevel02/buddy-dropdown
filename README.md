@@ -85,3 +85,26 @@ This project is configured with GitHub Actions to automatically build and releas
    - Create a new GitHub Release and upload the `.dmg` file.
 
 You can then download the installer directly from the repository's **Releases** page!
+
+## 6. Troubleshooting: Apple Developer Security Issue
+
+If you downloaded the `.dmg` from GitHub Releases, you might encounter a security warning when opening the app, such as **"Dropdown.app cannot be opened because the developer cannot be verified"** or **"Dropdown.app is damaged and can't be opened."** This is due to macOS Gatekeeper flagging apps that aren't officially signed by an Apple Developer account.
+
+To fix this and bypass Gatekeeper:
+
+### Method 1 (Recommended): Remove quarantine attribute
+
+Open your terminal and run the following command to remove the quarantine flag:
+
+```bash
+xattr -cr /Applications/Dropdown.app
+```
+
+_(Make sure to adjust the path if you installed it somewhere other than `/Applications`)_
+
+### Method 2: System Preferences
+
+1. Try to open the app (it will be blocked).
+2. Open **System Settings** > **Privacy & Security**.
+3. Scroll down to the **Security** section.
+4. You should see a message saying "Dropdown.app was blocked from use because it is not from an identified developer." Click **Open Anyway**.
